@@ -8,6 +8,11 @@ Reinforcement learning with Gym, Gazebo and real robot
 
 # Setup environment
 
+```
+$ git clone https://github.com/championway/rl-robot.git
+$ cd ~/rl-robot && source environment.sh
+```
+
 ## Install gym-gazebo
 ```
 $ pip install gym
@@ -23,14 +28,14 @@ $ cd ~rl-robot/catkin_ws/src/
 $ git clone https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
 $ cd ../catkin_ws && catkin_make
 ```
-reference: http://emanual.robotis.com/docs/en/platform/turtlebot3/simulation/
+Reference: http://emanual.robotis.com/docs/en/platform/turtlebot3/simulation/
 
 # How to run
 
 ## Build environment
 (Do this everytime when you start a new terminal)
 ```
-$ cd ~rl-robot/
+$ cd ~/rl-robot/
 $ source environment.sh
 ```
 
@@ -45,7 +50,7 @@ $ roslaunch turtlebot3_gazebo turtlebot3_world.launch
 ## Gym-gazebo Training
 - DQN
 ```
-$ cd ~rl-robot/rl-algorithm/DQN
+$ cd ~/rl-robot/rl-algorithm/DQN
 $ python circuit_turtlebot_dqn.py
 ```
 See training [tips](#Tips)
