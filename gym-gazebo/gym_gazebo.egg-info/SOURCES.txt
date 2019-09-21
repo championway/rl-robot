@@ -1,0 +1,6 @@
+setup.py
+gym_gazebo.egg-info/PKG-INFO
+gym_gazebo.egg-info/SOURCES.txt
+gym_gazebo.egg-info/dependency_links.txt
+gym_gazebo.egg-info/requires.txt
+gym_gazebo.egg-info/top_level.txt
