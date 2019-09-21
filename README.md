@@ -18,15 +18,15 @@ $ cd ~/rl-robot && source environment.sh
 $ pip install gym
 $ cd gym-gazebo
 $ pip install -e .
-- add "--user" when pip install encounter permission deny
 ```
+Add "--user" when pip install encounter permission deny
 
 ## Turtlebot3 Gazebo environment
 ```
-$ sudo apt-get install ros-kinetic-turtlebot3 -briningup
-$ cd ~rl-robot/catkin_ws/src/
+$ sudo apt-get install ros-kinetic-turtlebot3-bringup
+$ cd ~/rl-robot/catkin_ws/src/
 $ git clone https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
-$ cd ../catkin_ws && catkin_make
+$ cd ../ && catkin_make
 ```
 Reference: http://emanual.robotis.com/docs/en/platform/turtlebot3/simulation/
 
