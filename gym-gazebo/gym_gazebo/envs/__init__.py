@@ -1,1 +1,2 @@
 from gym_gazebo.envs.gazebo_circle_env import GazeboCircleEnv
+from gym_gazebo.envs.gazebo_subt_env import GazeboSubtEnv

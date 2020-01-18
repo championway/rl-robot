@@ -23,12 +23,14 @@ INITIAL_STATES = [[14.38, -0.05, -0.74, 0, 0.14, 0, 1],
                   [116, 40, -20, 0, 0, 1, 0],
                   [140, 43, -20, 0, 0, 0.7, 0.7]]
 
-class GazeboCircleEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
+class GazeboSubtEnv(gym.Env):
+    metadata = {'render.modes': ['laser']}
 
     def __init__(self):
-        rospy.init_node('gym_gazebo_circle')
-        self.laser = LaserScan()
+        rospy.init_node('gym_gazebo_subt')
+        self.laser_upper = LaserScan()
+        self.laser_lower = LaserScan()
+        self.n_action = 21
         self.actions = [[0.5, -0.8],
                         [1.5, -0.8],
                         [1.5, -0.4],
@@ -44,12 +46,20 @@ class GazeboCircleEnv(gym.Env):
         self.pause_physics = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
         self.unpause_physics = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
 
-        self.pub_twist = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+        self.pub_twist = rospy.Publisher('/X1/cmd_vel', Twist, queue_size=1)
 
+        self.sub_laser_upper = rospy.Subscriber(
+            '/RL/scan/upper', LaserScan, self.cb_laser_upper, queue_size=1)
+        self.sub_laser_lower = rospy.Subscriber(
+            '/RL/scan/lower', LaserScan, self.cb_laser_lower, queue_size=1)
+        
         self.reset()
 
-    def cb_laser(self, msg):
-        self.laser = msg
+    def cb_laser_upper(self, msg):
+        self.laser_upper = msg
+
+    def cb_laser_lower(self, msg):
+        self.laser_lower = msg
 
     def step(self, action):
         rospy.wait_for_service('/gazebo/unpause_physics')
@@ -58,16 +68,12 @@ class GazeboCircleEnv(gym.Env):
         except (rospy.ServiceException) as e:
             print("/gazebo/unpause_physics service call failed")
 
-        # Do action
-        # cmd_vel = Twist()
+        cmd_vel = Twist()
         # cmd_vel.linear.x = self.actions[action][0]
         # cmd_vel.angular.z = self.actions[action][1]
-        # self.pub_twist.publish(cmd_vel)
-        max_ang_speed = 0.5
-        ang_vel = (action-10)*max_ang_speed*0.1 #from (-0.33 to + 0.33)
-        cmd_vel = Twist()
-        cmd_vel.linear.x = 0.2
-        cmd_vel.angular.z = ang_vel
+        cmd_vel.linear.x = self.get_action(action)[1]
+        cmd_vel.angular.z = self.get_action(action)[0]
+
         self.pub_twist.publish(cmd_vel)
 
         # Get environment laserscan state observation
@@ -82,27 +88,36 @@ class GazeboCircleEnv(gym.Env):
 
         # Caculate reward and check if it's done
         info = {}
-        state, done = self.calculate_observation(observation)
+        state, done = self.get_state(observation)
         
-        if not done:
-            # Straight reward = 5, Max angle reward = 0.5
-            reward = round(15*(max_ang_speed - abs(ang_vel) +0.0335), 2)
-            # print ("Action : "+str(action)+" Ang_vel : "+str(ang_vel)+" reward="+str(reward))
-        else:
+        # factor = 3-abs(action-3)
+        # reward = 2**factor
+        # reward = round(15*(0.8*2 - abs(cmd_vel.angular.z)), 2)
+        n_factor = int((self.n_action-1)/2)
+        reward = round((n_factor - abs(action - n_factor))*5/n_factor, 2)
+
+        too_close = False
+        for i, dis in enumerate(state):
+            if dis < 1 :
+                too_close = True
+        if too_close:
+            reward = -50
+        if done:
             reward = -200
+        # print action, reward
 
         return state, reward, done, info
 
     def reset(self):
-        # self.reset_model(self.get_initial_state(
-        #     np.random.randint(0, len(INITIAL_STATES))))
+        self.reset_model(self.get_initial_state(
+            np.random.randint(0, len(INITIAL_STATES))))
 
         # Resets the state of the environment and returns an initial observation.
-        rospy.wait_for_service('/gazebo/reset_simulation')
-        try:
-            self.reset_sim()
-        except (rospy.ServiceException) as e:
-            print ("/gazebo/reset_simulation service call failed")
+        # rospy.wait_for_service('/gazebo/reset_simulation')
+        # try:
+        #     self.reset_sim()
+        # except (rospy.ServiceException) as e:
+        #     print ("/gazebo/reset_simulation service call failed")
 
         # Unpause simulation to make observation
         rospy.wait_for_service('/gazebo/unpause_physics')
@@ -123,18 +138,22 @@ class GazeboCircleEnv(gym.Env):
         except (rospy.ServiceException) as e:
             print("/gazebo/pause_physics service call failed")
 
-        state, done = self.calculate_observation(observation)
+        state, done = self.get_state(observation)
 
         return state
 
     def get_observation(self):
-        data = None
-        while data is None:
+        data1 = None
+        data2 = None
+        while data1 is None or data2 is None:
             try:
-                data = rospy.wait_for_message('/scan', LaserScan, timeout=5)
+                data1 = rospy.wait_for_message(
+                    '/RL/scan/upper', LaserScan, timeout=5)
+                data2 = rospy.wait_for_message(
+                    '/RL/scan/lower', LaserScan, timeout=5)
             except:
 				pass
-        return data
+        return data1, data2
 
     def render(self, mode='laser'):
         pass
@@ -143,20 +162,30 @@ class GazeboCircleEnv(gym.Env):
         self.unpause_physics()
         rospy.signal_shutdown('Shutdown')
 
-    def calculate_observation(self, data):
+    def get_state(self, data):
+        data1 = data[0]
+        data2 = data[1]
         laser = []
         done = False
-        min_dis = 0.2
-        dis_threshold = 0.45
-        for i, dis in enumerate(list(data.ranges)):
-            if i >= 180:
-                break
-            if dis == np.inf or dis > dis_threshold:
-                laser.append(0)
+        min_dis = 0.8
+        max_dis = 1.5
+        value = None
+        for i, dis in enumerate(list(data1.ranges)):
+            if dis == np.inf or dis > max_dis:
+                value = max_dis
             else:
-                laser.append(1)
+                value = dis
             if dis < min_dis:
                 done = True
+            laser.append(value)
+        for i, dis in enumerate(list(data2.ranges)):
+            if dis == np.inf or dis > max_dis:
+                value = max_dis
+            else:
+                value = dis
+            if dis < min_dis:
+                done = True
+            laser.append(value)
         return np.array(laser), done
 
     def discretize_observation(self, data, new_ranges):
@@ -175,6 +204,15 @@ class GazeboCircleEnv(gym.Env):
             if (min_range > data.ranges[i] > 0):
                 done = True
         return discretized_ranges, done
+
+    def get_action(self, id):
+        # y = -((1.3*x)**2) + 1.5
+        # range: -0.8~0.8
+        delta = float(1.6/(self.n_action - 1))
+        index = int(-(self.n_action - 1)/2) + id
+        x = float(index) * delta
+        y = -((1.3*x)**2) + 1.5
+        return x, y
 
     def get_initial_state(self, id):
         # start position

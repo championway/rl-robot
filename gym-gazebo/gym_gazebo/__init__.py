@@ -4,7 +4,7 @@ register(
     id='gazebo-circle-v0',
     entry_point='gym_gazebo.envs:GazeboCircleEnv',
 )
-# register(
-#     id='foo-extrahard-v0',
-#     entry_point='gym_foo.envs:FooExtraHardEnv',
-# )
+register(
+    id='gazebo-subt-v0',
+    entry_point='gym_gazebo.envs:GazeboSubtEnv',
+)
